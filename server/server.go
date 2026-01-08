@@ -30,7 +30,7 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 		return
 	}
 
-	server.Clients = append(server.Clients, Client{ID: "unknown", WS: ws})
+	server.Clients = append(server.Clients, Client{ID: request.RemoteAddr, WS: ws})
 
 	for {
 		_, message, err := ws.ReadMessage()
@@ -41,7 +41,7 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 			})
 			break
 		}
-		fmt.Printf("Received: %s\n", message)
+		fmt.Printf("%s sent: %s\n", request.RemoteAddr, message)
 		server.Queue <- string(message)
 	}
 }
