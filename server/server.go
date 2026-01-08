@@ -9,7 +9,7 @@ import (
 )
 
 type Server struct {
-	Clients []*websocket.Conn
+	Clients []Client
 	Queue   chan string
 }
 
@@ -30,14 +30,14 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 		return
 	}
 
-	server.Clients = append(server.Clients, ws)
+	server.Clients = append(server.Clients, Client{ID: "unknown", WS: ws})
 
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
 			fmt.Printf("ReadMessage failed: %s\n", err)
-			server.Clients = slices.DeleteFunc(server.Clients, func(client *websocket.Conn) bool {
-				return client == ws
+			server.Clients = slices.DeleteFunc(server.Clients, func(client Client) bool {
+				return client.WS == ws
 			})
 			break
 		}
@@ -49,7 +49,8 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 func (server *Server) DeliverMessages(queue <-chan string) {
 	for message := range queue {
 		for _, client := range server.Clients {
-			client.WriteMessage(websocket.TextMessage, []byte(message))
+			sentMessage := fmt.Sprintf("%s wrote: %s\n", client.ID, message)
+			client.WS.WriteMessage(websocket.TextMessage, []byte(sentMessage))
 		}
 	}
 }
