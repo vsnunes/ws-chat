@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -27,17 +27,8 @@ func HandleNewConnection(writer http.ResponseWriter, request *http.Request) {
 			break
 		}
 		fmt.Printf("Received: %s\n", message)
-	}
-}
 
-func main() {
-	var port = 8080
-	fmt.Println("ws-chat server")
-	http.HandleFunc("/ws", HandleNewConnection)
-
-	fmt.Printf("Server listening on port %d\n", port)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-	if err != nil {
-		fmt.Printf("Failed to bind address: %s\n", err)
+		//reply back original message
+		ws.WriteMessage(websocket.TextMessage, message)
 	}
 }

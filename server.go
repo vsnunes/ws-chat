@@ -1,0 +1,19 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"ws-chat/server/server"
+)
+
+func main() {
+	var port = 8080
+	fmt.Println("ws-chat server")
+	http.HandleFunc("/ws", server.HandleNewConnection)
+
+	fmt.Printf("Server listening on port %d\n", port)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if err != nil {
+		fmt.Printf("Failed to bind address: %s\n", err)
+	}
+}
