@@ -8,13 +8,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type MessageEnvelope struct {
+	Sender  string
+	Message string
+}
+
 type Server struct {
 	Clients []Client
-	Queue   chan string
+	Queue   chan MessageEnvelope
 }
 
 func NewServer() Server {
-	return Server{Queue: make(chan string)}
+	return Server{Queue: make(chan MessageEnvelope)}
 }
 
 func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *http.Request) {
@@ -42,14 +47,18 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 			break
 		}
 		fmt.Printf("%s sent: %s\n", request.RemoteAddr, message)
-		server.Queue <- string(message)
+		server.Queue <- MessageEnvelope{Sender: request.RemoteAddr, Message: string(message)}
 	}
 }
 
-func (server *Server) DeliverMessages(queue <-chan string) {
-	for message := range queue {
+func (server *Server) DeliverMessages(queue <-chan MessageEnvelope) {
+	for envelope := range queue {
 		for _, client := range server.Clients {
-			sentMessage := fmt.Sprintf("%s wrote: %s\n", client.ID, message)
+			// do not send the message back to the sender
+			if client.ID == envelope.Sender {
+				continue
+			}
+			sentMessage := fmt.Sprintf("%s wrote: %s\n", client.ID, envelope.Message)
 			client.WS.WriteMessage(websocket.TextMessage, []byte(sentMessage))
 		}
 	}
