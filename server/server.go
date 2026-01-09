@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/gorilla/websocket"
 )
@@ -35,15 +34,26 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 		return
 	}
 
-	server.Clients = append(server.Clients, Client{ID: request.RemoteAddr, WS: ws})
+	client := Client{ID: request.RemoteAddr, WS: ws}
+	server.Clients = append(server.Clients, client)
+	server.Queue <- MessageEnvelope{Sender: "Server", Message: fmt.Sprintf("%s has joined the server.", client.ID)}
 
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
 			fmt.Printf("ReadMessage failed: %s\n", err)
-			server.Clients = slices.DeleteFunc(server.Clients, func(client Client) bool {
-				return client.WS == ws
-			})
+
+			var deadClient_idx int
+			for client_idx, client := range server.Clients {
+				if client.WS == ws {
+					deadClient_idx = client_idx
+					break
+				}
+			}
+
+			deadClient := server.Clients[deadClient_idx]
+			server.Clients = append(server.Clients[:deadClient_idx], server.Clients[deadClient_idx+1:]...)
+			server.Queue <- MessageEnvelope{Sender: "Server", Message: fmt.Sprintf("%s has left the server.", deadClient.ID)}
 			break
 		}
 		fmt.Printf("%s sent: %s\n", request.RemoteAddr, message)
@@ -52,13 +62,20 @@ func (server *Server) HandleNewConnection(writer http.ResponseWriter, request *h
 }
 
 func (server *Server) DeliverMessages(queue <-chan MessageEnvelope) {
+	var sentMessage string
 	for envelope := range queue {
 		for _, client := range server.Clients {
 			// do not send the message back to the sender
 			if client.ID == envelope.Sender {
 				continue
 			}
-			sentMessage := fmt.Sprintf("%s wrote: %s\n", client.ID, envelope.Message)
+
+			if envelope.Sender == "Server" {
+				sentMessage = envelope.Message
+			} else {
+				sentMessage = fmt.Sprintf("%s wrote: %s\n", client.ID, envelope.Message)
+			}
+
 			client.WS.WriteMessage(websocket.TextMessage, []byte(sentMessage))
 		}
 	}
